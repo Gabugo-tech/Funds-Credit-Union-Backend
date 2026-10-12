@@ -30,13 +30,12 @@ app.use(cors({
       process.env.FRONTEND_URL ?? "http://localhost:3000",
       "http://localhost:3000",
       "http://localhost:3001",
-      "https://evergreen.vercel.app",
-      "https://evergreen-banking-lac.vercel.app",
-      "https://evergreen-frontend-lac.vercel.app",
-      "https://evergreen-world-bank.vercel.app",
+      "https://fundscreditunion.vercel.app",
+      "https://funds-credit-union.vercel.app",
+      "https://fundscreditunion-frontend.vercel.app",
     ];
-    // Scope the CORS wildcard to Evergreen Vercel deployments only
-    if (allowed.includes(origin) || /https:\/\/evergreen[-a-z0-9]*\.vercel\.app$/.test(origin)) {
+    // Scope the CORS wildcard to Funds Credit Union Vercel deployments only
+    if (allowed.includes(origin) || /https:\/\/fundscreditunion[-a-z0-9]*\.vercel\.app$/.test(origin)) {
       return callback(null, true);
     }
     return callback(new Error(`CORS: origin ${origin} not allowed`));
@@ -84,7 +83,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 app.get("/api/health", (_req, res) => {
   res.json({
     status:  "healthy",
-    service: "evergreen-api-gateway",
+    service: "funds-credit-union-api-gateway",
     version: "1.0.0",
     timestamp: new Date().toISOString(),
   });

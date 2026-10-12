@@ -5,7 +5,7 @@ import { logger } from "./utils/logger";
 const PORT = process.env.PORT || 4000;
 
 const server = app.listen(PORT, () => {
-  logger.info(`🌿 Evergreen API gateway running on port ${PORT}`);
+  logger.info(`Funds Credit Union API gateway running on port ${PORT}`);
   logger.info(`   Environment: ${process.env.NODE_ENV ?? "development"}`);
   logger.info(`   API docs:    http://localhost:${PORT}/api/health`);
 });

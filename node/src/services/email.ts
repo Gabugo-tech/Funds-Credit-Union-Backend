@@ -6,8 +6,8 @@ if (!process.env.BREVO_API_KEY) {
 
 const client = new BrevoClient({ apiKey: process.env.BREVO_API_KEY ?? "" });
 
-const FROM_EMAIL = process.env.BREVO_FROM_EMAIL ?? "noreply@evergreen.com";
-const FROM_NAME  = "Evergreen Bank";
+const FROM_EMAIL = process.env.BREVO_FROM_EMAIL ?? "noreply@fundscreditunion.com";
+const FROM_NAME  = "Funds Credit Union";
 
 async function send(to: string, subject: string, htmlContent: string, textContent: string) {
   await client.transactionalEmails.sendTransacEmail({
@@ -33,27 +33,27 @@ function buildOtpEmail(subtitle: string, message: string, otp: string): string {
     .warn{background:#451a03;border:1px solid #92400e;border-radius:8px;padding:12px 16px;font-size:13px;color:#fbbf24;margin-top:20px}
     .f{padding:20px 40px;border-top:1px solid #334155;font-size:12px;color:#475569;text-align:center}
   </style></head><body><div class="c">
-    <div class="h"><h1>🌿 Evergreen</h1><p>${subtitle}</p></div>
+    <div class="h"><h1>Funds Credit Union</h1><p>${subtitle}</p></div>
     <div class="b">
       <p>${message}</p>
       <div class="otp"><div class="code">${otp}</div><div class="note">Expires in 15 minutes</div></div>
-      <div class="warn">⚠️ Never share this code. Evergreen staff will never ask for your OTP.</div>
+      <div class="warn">⚠️ Never share this code. Funds Credit Union staff will never ask for your OTP.</div>
     </div>
-    <div class="f">© 2026 Evergreen Financial Limited</div>
+    <div class="f">© 2026 Funds Credit Union</div>
   </div></body></html>`;
 }
 
 export async function sendPasswordResetOtp(toEmail: string, otp: string): Promise<void> {
-  await send(toEmail, "Your Evergreen Password Reset Code",
-    buildOtpEmail("Reset your password", "Use the code below to reset your Evergreen account password:", otp),
-    `Your Evergreen password reset code is: ${otp}\n\nExpires in 15 minutes.`
+  await send(toEmail, "Your Funds Credit Union Password Reset Code",
+    buildOtpEmail("Reset your password", "Use the code below to reset your Funds Credit Union account password:", otp),
+    `Your Funds Credit Union password reset code is: ${otp}\n\nExpires in 15 minutes.`
   );
 }
 
 export async function sendPinResetOtp(toEmail: string, otp: string): Promise<void> {
-  await send(toEmail, "Your Evergreen Payment PIN Reset Code",
-    buildOtpEmail("Reset your payment PIN", "Use the code below to reset your Evergreen payment PIN:", otp),
-    `Your Evergreen payment PIN reset code is: ${otp}\n\nExpires in 15 minutes.`
+  await send(toEmail, "Your Funds Credit Union Payment PIN Reset Code",
+    buildOtpEmail("Reset your payment PIN", "Use the code below to reset your Funds Credit Union payment PIN:", otp),
+    `Your Funds Credit Union payment PIN reset code is: ${otp}\n\nExpires in 15 minutes.`
   );
 }
 
@@ -85,9 +85,9 @@ export async function sendCreditAlert(params: {
     td{padding:10px 0;border-bottom:1px solid #334155}
     .f{padding:20px 40px;border-top:1px solid #334155;font-size:12px;color:#475569;text-align:center}
   </style></head><body><div class="c">
-    <div class="h"><h1>🌿 Evergreen</h1><p>You've received a transfer</p></div>
+    <div class="h"><h1>Funds Credit Union</h1><p>You've received a transfer</p></div>
     <div class="b">
-      <p>You have received a transfer from <strong>${senderName}</strong> via Evergreen Bank.</p>
+      <p>You have received a transfer from <strong>${senderName}</strong> via Funds Credit Union.</p>
       <table>
         <tr><td style="color:#94a3b8">Amount Sent</td><td style="text-align:right;font-weight:600">${amountStr}</td></tr>
         <tr><td style="color:#94a3b8">Amount to Receive</td><td style="text-align:right;font-weight:700;color:#60a5fa;font-size:18px">${receiveStr}</td></tr>
@@ -101,7 +101,7 @@ export async function sendCreditAlert(params: {
         ? `<div style="margin-top:20px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;font-size:13px;color:#94a3b8">⏳ <strong style="color:#e2e8f0">International Transfer:</strong> Funds typically arrive within 1–3 business days.</div>`
         : `<div style="margin-top:20px;background:#052e16;border:1px solid #166534;border-radius:8px;padding:14px;font-size:13px;color:#86efac">✅ <strong>Local Transfer:</strong> Funds have been processed.</div>`}
     </div>
-    <div class="f">© 2026 Evergreen Financial Limited · Automated notification.</div>
+    <div class="f">© 2026 Funds Credit Union · Automated notification.</div>
   </div></body></html>`;
 
   await send(toEmail, `You've received ${receiveStr} from ${senderName}`, htmlContent,

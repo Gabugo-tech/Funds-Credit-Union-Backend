@@ -1,6 +1,6 @@
-# Evergreen Backend
+# Funds Credit Union Backend
 
-Monorepo containing both backend services for the Evergreen fintech platform.
+Monorepo containing both backend services for the Funds Credit Union fintech platform.
 
 ```
 backend/

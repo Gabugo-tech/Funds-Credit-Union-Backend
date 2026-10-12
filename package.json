@@ -1,7 +1,7 @@
 {
-  "name": "evergreen-backend",
+  "name": "funds-credit-union-backend",
   "version": "1.0.0",
-  "description": "Evergreen monorepo — Node.js API gateway + FastAPI analytics service",
+  "description": "Funds Credit Union monorepo — Node.js API gateway + FastAPI analytics service",
   "private": true,
   "scripts": {
     "dev:node":    "cd node && npm run dev",

@@ -135,7 +135,7 @@ export async function sendMoney(req: AuthRequest, res: Response, next: NextFunct
 
     if (debitErr) throw new AppError(debitErr.message, 500);
 
-    // 3. Credit recipient if they have an Evergreen account
+    // 3. Credit recipient if they have a Funds Credit Union account
     if (recipientAccount) {
       const recipientCurrency         = (recipientAccount.currency as string).toUpperCase();
       const recipientRate             = FX_RATES[recipientCurrency] ?? 1;
@@ -191,7 +191,7 @@ export async function sendMoney(req: AuthRequest, res: Response, next: NextFunct
 
       sendCreditAlert({
         toEmail:      recipientEmail,
-        senderName:   senderUser?.full_name ?? "Evergreen User",
+        senderName:   senderUser?.full_name ?? "Funds Credit Union User",
         amount:       body.amount,
         fromCurrency: fromCurrencyUC,
         toCurrency:   body.to_currency.toUpperCase(),
@@ -200,7 +200,7 @@ export async function sendMoney(req: AuthRequest, res: Response, next: NextFunct
         description:  body.description,
         transferType: body.transfer_type,
         date:         new Date().toISOString(),
-        // Include new balance only for internal Evergreen recipients
+        // Include new balance only for internal Funds Credit Union recipients
         recipientNewBalance: recipientAccount
           ? +(((typeof recipientAccount.balance === "string" ? parseFloat(recipientAccount.balance) : Number(recipientAccount.balance)) + (body.amount / fromRate) * (FX_RATES[(recipientAccount.currency as string).toUpperCase()] ?? 1))).toFixed(2)
           : undefined,

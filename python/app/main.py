@@ -21,22 +21,22 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(
-        "🌿 Evergreen Analytics API starting",
+        "Funds Credit Union Analytics API starting",
         version=settings.APP_VERSION,
         env=settings.ENVIRONMENT,
     )
     yield
-    logger.info("Evergreen Analytics API shutting down")
+    logger.info("Funds Credit Union Analytics API shutting down")
 
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="""
-## Evergreen Analytics API
+## Funds Credit Union Analytics API
 
 Python/FastAPI microservice providing data analytics, investment insights,
-and AI-powered financial analysis for the Evergreen fintech platform.
+and AI-powered financial analysis for the Funds Credit Union fintech platform.
 
 ### Capabilities
 - Spending analysis by category and time period

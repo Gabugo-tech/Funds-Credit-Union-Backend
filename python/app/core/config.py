@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     )
 
     # App
-    APP_NAME: str = "Evergreen Analytics API"
+    APP_NAME: str = "Funds Credit Union Analytics API"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     ENVIRONMENT: str = "production"
@@ -40,8 +40,8 @@ class Settings(BaseSettings):
         return [
             self.FRONTEND_URL,
             self.NODE_GATEWAY_URL,
-            "https://evergreen.vercel.app",
-            "https://evergreen-api.up.railway.app",
+            "https://fundscreditunion.vercel.app",
+            "https://funds-credit-union-api.up.railway.app",
         ]
 
 

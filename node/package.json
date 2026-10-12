@@ -1,7 +1,7 @@
 {
-  "name": "evergreen-backend-node",
+  "name": "funds-credit-union-backend-node",
   "version": "1.0.0",
-  "description": "Evergreen fintech — Node.js/Express API gateway",
+  "description": "Funds Credit Union — Node.js/Express API gateway",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",

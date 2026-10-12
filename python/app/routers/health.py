@@ -10,7 +10,7 @@ settings = get_settings()
 async def health():
     return {
         "status":      "healthy",
-        "service":     "evergreen-analytics-api",
+        "service":     "funds-credit-union-analytics-api",
         "version":     settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
         "timestamp":   datetime.utcnow().isoformat(),
