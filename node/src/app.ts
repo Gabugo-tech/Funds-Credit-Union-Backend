@@ -58,6 +58,7 @@ app.use(cors({
       "https://fundscreditunion.vercel.app",
       "https://funds-credit-union.vercel.app",
       "https://fundscreditunion-frontend.vercel.app",
+      "https://funds-credit-union-bank.vercel.app",
     ];
     if (allowed.includes(origin) || /https:\/\/fundscreditunion[-a-z0-9]*\.vercel\.app$/.test(origin)) {
       return callback(null, true);
