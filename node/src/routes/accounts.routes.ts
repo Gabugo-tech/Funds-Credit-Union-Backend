@@ -8,14 +8,6 @@ const router = Router();
 // All routes require authentication
 router.use(authenticate);
 
-// Tight rate limit on account lookup to prevent enumeration
-const lookupLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 20,
-  validate: { xForwardedForHeader: false },
-  message: { error: "Too many lookup requests. Please slow down." },
-});
-
 // GET /api/accounts/lookup/:account_number
 router.get("/lookup/:account_number", lookupLimiter, ctrl.lookupAccount);
 
