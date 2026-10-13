@@ -3,8 +3,8 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import compression from "compression";
-import rateLimit from "express-rate-limit";
 import { randomUUID } from "crypto";
+import { globalLimiter, authLimiter, adminLimiter } from "./middleware/limiters";
 
 import authRoutes         from "./routes/auth.routes";
 import accountRoutes      from "./routes/accounts.routes";
@@ -69,39 +69,6 @@ app.use(cors({
   allowedHeaders: ["Content-Type","Authorization","X-Request-ID"],
 }));
 
-// ─── Rate limiting ────────────────────────────────────────────────────────────
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
-  message: { error: "Too many requests. Please try again later." },
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  validate: { xForwardedForHeader: false },
-  message: { error: "Too many auth attempts. Please try again in 15 minutes." },
-});
-
-// Strict limiter for admin endpoints
-const adminLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  validate: { xForwardedForHeader: false },
-  message: { error: "Too many admin requests. Please try again later." },
-});
-
-// Very tight limiter for the unauthenticated visitor log endpoint
-const visitorLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  validate: { xForwardedForHeader: false },
-  message: { error: "Too many requests." },
-});
-
 app.use(globalLimiter);
 
 // ─── Body parsing — intentionally small limit for a banking API ───────────────
@@ -136,9 +103,6 @@ app.use("/api/transactions",                  transactionRoutes);
 app.use("/api/payments",                      paymentRoutes);
 app.use("/api/notifications",                 notificationRoutes);
 app.use("/api/admin",         adminLimiter,   adminRoutes);
-
-// Export visitorLimiter so admin routes can apply it to the public endpoint
-export { visitorLimiter };
 
 // ─── 404 ──────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {

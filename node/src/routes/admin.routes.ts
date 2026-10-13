@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth";
-import { visitorLimiter } from "../app";
+import { visitorLimiter } from "../middleware/limiters";
 import * as ctrl from "../controllers/admin.controller";
 
 const router = Router();
