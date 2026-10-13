@@ -7,6 +7,7 @@ import { sendCreditAlert } from "../services/email";
 import { AuthRequest } from "../middleware/auth";
 import { successResponse, errorResponse } from "../utils/response";
 import { AppError } from "../middleware/errorHandler";
+import { logger } from "../utils/logger";
 
 // Static FX rates relative to USD (in production: fetch from live rate provider)
 const FX_RATES: Record<string, number> = {
@@ -72,7 +73,7 @@ export async function sendMoney(req: AuthRequest, res: Response, next: NextFunct
     const feeInAccountCurrency    = feeUSD * accountRate; // feeUSD * (accountRate / USD_rate=1)
     const totalDebit              = amountInAccountCurrency + feeInAccountCurrency;
 
-    console.log(
+    logger.info(
       `[sendMoney] balance=${balance} ${accountCurrency} | ` +
       `send=${body.amount} ${fromCurrencyUC} → ${amountInAccountCurrency.toFixed(4)} ${accountCurrency} | ` +
       `fee=$${feeUSD} USD → ${feeInAccountCurrency.toFixed(4)} ${accountCurrency} | ` +
@@ -82,10 +83,10 @@ export async function sendMoney(req: AuthRequest, res: Response, next: NextFunct
     // Only block local transfers for insufficient funds.
     // Round to 2 decimal places to avoid floating-point precision issues
     // (e.g. balance stored as 29.589999 displayed as 29.59).
-    if (body.transfer_type === "local" && Math.round(balance * 100) < Math.round(totalDebit * 100)) {
-      console.log(`[sendMoney] INSUFFICIENT: balance(${balance}) < totalDebit(${totalDebit.toFixed(4)})`);
-      return errorResponse(res, "Insufficient balance", 422);
-    }
+      if (body.transfer_type === "local" && Math.round(balance * 100) < Math.round(totalDebit * 100)) {
+        logger.warn(`[sendMoney] INSUFFICIENT: balance(${balance}) < totalDebit(${totalDebit.toFixed(4)})`);
+        return errorResponse(res, "Insufficient balance", 422);
+      }
 
     // Generate collision-proof references using UUID segments
     const baseRef     = uuidv4().replace(/-/g, "").slice(0, 16).toUpperCase();
@@ -161,7 +162,7 @@ export async function sendMoney(req: AuthRequest, res: Response, next: NextFunct
             account_id:        recipientAccount.id,
             type:              "credit",
             status:            "completed",
-            amount:            creditAmount,   // positive
+            amount:            creditAmount,
             currency:          recipientCurrency,
             description:       body.description,
             reference:         referenceCR,
@@ -170,7 +171,7 @@ export async function sendMoney(req: AuthRequest, res: Response, next: NextFunct
             category:          "Transfer",
           });
       } catch (creditErr) {
-        console.warn("[sendMoney] Credit transaction insert failed:", creditErr);
+        logger.warn("[sendMoney] Credit transaction insert failed", creditErr);
       }
     }
 
@@ -200,14 +201,13 @@ export async function sendMoney(req: AuthRequest, res: Response, next: NextFunct
         description:  body.description,
         transferType: body.transfer_type,
         date:         new Date().toISOString(),
-        // Include new balance only for internal Funds Credit Union recipients
         recipientNewBalance: recipientAccount
           ? +(((typeof recipientAccount.balance === "string" ? parseFloat(recipientAccount.balance) : Number(recipientAccount.balance)) + (body.amount / fromRate) * (FX_RATES[(recipientAccount.currency as string).toUpperCase()] ?? 1))).toFixed(2)
           : undefined,
         recipientCurrency: recipientAccount
           ? (recipientAccount.currency as string).toUpperCase()
           : undefined,
-      }).catch(err => console.warn("[sendMoney] Credit alert email failed:", err));
+      }).catch(err => logger.warn("[sendMoney] Credit alert email failed", err));
     }
 
     return successResponse(res, { transaction: tx, reference, fee: feeUSD }, "Transfer initiated", 201);

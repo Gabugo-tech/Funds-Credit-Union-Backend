@@ -5,11 +5,11 @@ import * as ctrl from "../controllers/transactions.controller";
 const router = Router();
 router.use(authenticate);
 
-// GET  /api/transactions             — paginated, filterable list
-router.get("/",          ctrl.listTransactions);
-
 // GET  /api/transactions/summary     — totals by category / period
 router.get("/summary",   ctrl.getSummary);
+
+// GET  /api/transactions             — paginated, filterable list
+router.get("/",          ctrl.listTransactions);
 
 // GET  /api/transactions/:id         — single transaction
 router.get("/:id",       ctrl.getTransaction);
