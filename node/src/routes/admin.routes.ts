@@ -1,16 +1,17 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth";
+import { visitorLimiter } from "../app";
 import * as ctrl from "../controllers/admin.controller";
 
 const router = Router();
 
-// Visitor logging — no auth required (called from frontend on every page load)
-router.post("/visitors", ctrl.logVisitor);
+// Visitor logging — no auth required but tightly rate-limited
+router.post("/visitors", visitorLimiter, ctrl.logVisitor);
 
 // All routes below require JWT authentication
 router.use(authenticate);
 
-// Stats — real counts from DB
+// Stats
 router.get("/stats",        ctrl.getStats);
 
 // Users
@@ -22,16 +23,16 @@ router.get("/transactions", ctrl.listAllTransactions);
 // Visitors (read)
 router.get("/visitors",     ctrl.listVisitors);
 
-// Admin test account
+// Admin account
 router.get("/account",      ctrl.getAdminAccount);
 
 // Admin transfer history
 router.get("/transfers",    ctrl.listAdminTransfers);
 
-// Delete user — removes all DB records + Supabase Auth entry
+// Test email
+router.post("/test-email",  ctrl.testEmail);
+
+// Delete user
 router.delete("/users/:id", ctrl.deleteUser);
 
 export default router;
-
-// POST /api/admin/test-email — send a test email to verify Gmail config (admin only)
-router.post("/test-email", ctrl.testEmail);

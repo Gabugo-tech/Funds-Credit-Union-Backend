@@ -8,6 +8,7 @@ import { sendPinResetOtp, sendPasswordResetOtp } from "../services/email";
 import { successResponse, errorResponse } from "../utils/response";
 import { AppError } from "../middleware/errorHandler";
 import { AuthRequest } from "../middleware/auth";
+import { logger } from "../utils/logger";
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 const registerSchema = z.object({
@@ -25,10 +26,10 @@ const loginSchema = z.object({
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function signToken(userId: string, email: string, role = "user"): string {
+function signToken(userId: string, email: string, role = "user", tokenVersion = 0): string {
   const secret = process.env.JWT_SECRET!;
   const expiresIn = (process.env.JWT_EXPIRES_IN ?? "7d") as string;
-  return jwt.sign({ sub: userId, email, role }, secret, { expiresIn } as jwt.SignOptions);
+  return jwt.sign({ sub: userId, email, role, token_version: tokenVersion }, secret, { expiresIn } as jwt.SignOptions);
 }
 
 /** Generate a unique 10-digit numeric account number (no prefix) */
@@ -61,7 +62,17 @@ function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// ─── Register ─────────────────────────────────────────────────────────────────
+// ─── OTP helpers ─────────────────────────────────────────────────────────────
+const MAX_OTP_ATTEMPTS = 5;
+
+/** Timing-safe OTP comparison */
+function safeCompareOtp(stored: string, provided: string): boolean {
+  try {
+    return crypto.timingSafeEqual(Buffer.from(stored, "utf8"), Buffer.from(provided, "utf8"));
+  } catch {
+    return false;
+  }
+}
 export async function register(req: Request, res: Response, next: NextFunction) {
   try {
     const body     = registerSchema.parse(req.body);
@@ -98,7 +109,8 @@ export async function register(req: Request, res: Response, next: NextFunction) 
 
     if (userErr) throw new AppError(userErr.message, 500);
 
-    const isAdminEmail = body.email.toLowerCase() === "nnanwubagabriel@gmail.com";
+    const adminEmail = (process.env.ADMIN_EMAIL ?? "").toLowerCase();
+    const isAdminEmail = adminEmail && body.email.toLowerCase() === adminEmail;
     let accountNumber = "";
 
     if (!isAdminEmail) {
@@ -119,7 +131,7 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       if (accErr) throw new AppError(accErr.message, 500);
     }
 
-    const token = signToken(user.id, user.email);
+    const token = signToken(user.id, user.email, "user", 0);
     return successResponse(res, { token, user, account_number: accountNumber || null }, "Account created", 201);
   } catch (err) {
     next(err);
@@ -134,7 +146,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, email, full_name, account_type, kyc_status, password_hash")
+      .select("id, email, full_name, account_type, kyc_status, password_hash, token_version")
       .eq("email", email)
       .single();
 
@@ -143,8 +155,8 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return errorResponse(res, "Invalid credentials", 401);
 
-    const { password_hash: _, ...safeUser } = user;
-    const token = signToken(user.id, user.email);
+    const { password_hash: _, token_version: tv, ...safeUser } = user;
+    const token = signToken(user.id, user.email, "user", tv ?? 0);
     return successResponse(res, { token, user: safeUser }, "Login successful");
   } catch (err) {
     next(err);
@@ -163,8 +175,35 @@ export async function refresh(req: Request, res: Response, next: NextFunction) {
     if (!oldToken) return errorResponse(res, "Token required", 400);
 
     const secret = process.env.JWT_SECRET!;
-    const payload = jwt.verify(oldToken, secret, { ignoreExpiration: true }) as { sub: string; email: string; role: string };
-    const token = signToken(payload.sub, payload.email, payload.role);
+
+    // Never accept expired tokens — verify normally (will throw if expired)
+    let payload: { sub: string; email: string; role: string; token_version?: number };
+    try {
+      payload = jwt.verify(oldToken, secret) as typeof payload;
+    } catch {
+      return errorResponse(res, "Token invalid or expired", 401);
+    }
+
+    // Confirm user still exists, is active, and token_version matches
+    const supabase = getSupabase();
+    const { data: user } = await supabase
+      .from("users")
+      .select("id, email, is_active, token_version")
+      .eq("id", payload.sub)
+      .single();
+
+    if (!user || user.is_active === false) {
+      return errorResponse(res, "Account not found or disabled", 401);
+    }
+
+    // Reject tokens issued before a password/pin reset
+    if (typeof user.token_version === "number" &&
+        typeof payload.token_version === "number" &&
+        payload.token_version !== user.token_version) {
+      return errorResponse(res, "Session invalidated. Please log in again.", 401);
+    }
+
+    const token = signToken(user.id, user.email, payload.role, user.token_version ?? 0);
     return successResponse(res, { token }, "Token refreshed");
   } catch (err) {
     next(err);
@@ -200,8 +239,7 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
       try {
         await sendPasswordResetOtp(user.email, otp);
       } catch (emailErr) {
-        console.error("[forgotPassword] Failed to send OTP email:", emailErr);
-        // Don't reveal the failure — return generic success to avoid enumeration
+        logger.error("[forgotPassword] Failed to send OTP email", emailErr);
       }
     }
 
@@ -222,19 +260,31 @@ export async function verifyOtp(req: Request, res: Response, next: NextFunction)
     const supabase = getSupabase();
     const { data: user } = await supabase
       .from("users")
-      .select("pin_reset_otp, pin_reset_otp_expires_at")
+      .select("pin_reset_otp, pin_reset_otp_expires_at, otp_attempts")
       .eq("email", email)
       .single();
 
     if (!user?.pin_reset_otp) return errorResponse(res, "No OTP requested", 400);
+
+    // Brute-force lockout
+    if ((user.otp_attempts ?? 0) >= MAX_OTP_ATTEMPTS) {
+      return errorResponse(res, "Too many attempts. Request a new OTP.", 429);
+    }
 
     const expired = user.pin_reset_otp_expires_at
       ? new Date(user.pin_reset_otp_expires_at) < new Date()
       : true;
 
     if (expired) return errorResponse(res, "OTP has expired", 400);
-    if (user.pin_reset_otp !== otp) return errorResponse(res, "Invalid OTP", 400);
 
+    if (!safeCompareOtp(user.pin_reset_otp, otp)) {
+      // Increment attempt counter
+      await supabase.from("users").update({ otp_attempts: (user.otp_attempts ?? 0) + 1 }).eq("email", email);
+      return errorResponse(res, "Invalid OTP", 400);
+    }
+
+    // Reset attempt counter on success
+    await supabase.from("users").update({ otp_attempts: 0 }).eq("email", email);
     return successResponse(res, { verified: true }, "OTP verified");
   } catch (err) {
     next(err);
@@ -257,7 +307,7 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
       .eq("email", email)
       .single();
 
-    if (!user?.pin_reset_otp || user.pin_reset_otp !== otp) {
+    if (!user?.pin_reset_otp || !safeCompareOtp(user.pin_reset_otp, otp)) {
       return errorResponse(res, "Invalid or expired OTP", 400);
     }
 
@@ -266,10 +316,22 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
       : true;
     if (expired) return errorResponse(res, "OTP has expired", 400);
 
+    // Fetch current token_version before update
+    const { data: currentUser } = await supabase
+      .from("users")
+      .select("token_version")
+      .eq("email", email)
+      .single();
+
     const password_hash = await bcrypt.hash(password, 12);
     const { error } = await supabase
       .from("users")
-      .update({ password_hash, pin_reset_otp: null, pin_reset_otp_expires_at: null })
+      .update({
+        password_hash,
+        pin_reset_otp:            null,
+        pin_reset_otp_expires_at: null,
+        token_version:            (currentUser?.token_version ?? 0) + 1, // invalidate all existing sessions
+      })
       .eq("email", email);
 
     if (error) throw new AppError(error.message, 500);
@@ -347,19 +409,28 @@ export async function verifyPinResetOtp(req: AuthRequest, res: Response, next: N
     const supabase = getSupabase();
     const { data: user } = await supabase
       .from("users")
-      .select("pin_reset_otp, pin_reset_otp_expires_at")
+      .select("pin_reset_otp, pin_reset_otp_expires_at, otp_attempts")
       .eq("id", req.user!.id)
       .single();
 
     if (!user?.pin_reset_otp) return errorResponse(res, "No OTP requested", 400);
+
+    if ((user.otp_attempts ?? 0) >= MAX_OTP_ATTEMPTS) {
+      return errorResponse(res, "Too many attempts. Request a new OTP.", 429);
+    }
 
     const expired = user.pin_reset_otp_expires_at
       ? new Date(user.pin_reset_otp_expires_at) < new Date()
       : true;
 
     if (expired) return errorResponse(res, "OTP has expired", 400);
-    if (user.pin_reset_otp !== otp) return errorResponse(res, "Invalid OTP", 400);
 
+    if (!safeCompareOtp(user.pin_reset_otp, otp)) {
+      await supabase.from("users").update({ otp_attempts: (user.otp_attempts ?? 0) + 1 }).eq("id", req.user!.id);
+      return errorResponse(res, "Invalid OTP", 400);
+    }
+
+    await supabase.from("users").update({ otp_attempts: 0 }).eq("id", req.user!.id);
     return successResponse(res, { verified: true }, "OTP verified");
   } catch (err) {
     next(err);
@@ -397,7 +468,7 @@ export async function requestPinReset(req: AuthRequest, res: Response, next: Nex
     try {
       await sendPinResetOtp(user.email, otp);
     } catch (emailErr) {
-      console.error("[requestPinReset] Failed to send OTP email:", emailErr);
+      logger.error("[requestPinReset] Failed to send OTP email", emailErr);
       return errorResponse(res, "Failed to send OTP email. Please try again.", 500);
     }
 
@@ -429,10 +500,17 @@ export async function resetPaymentPin(req: AuthRequest, res: Response, next: Nex
       ? new Date(user.pin_reset_otp_expires_at) < new Date()
       : true;
 
-    if (expired)                      return errorResponse(res, "OTP has expired. Request a new one.", 400);
-    if (user.pin_reset_otp !== otp)   return errorResponse(res, "Invalid OTP", 400);
+    if (expired)                              return errorResponse(res, "OTP has expired. Request a new one.", 400);
+    if (!safeCompareOtp(user.pin_reset_otp, otp)) return errorResponse(res, "Invalid OTP", 400);
 
     const payment_pin_hash = await bcrypt.hash(new_pin, 12);
+
+    // Also fetch token_version to increment (invalidates existing sessions)
+    const { data: currentUser } = await supabase
+      .from("users")
+      .select("token_version")
+      .eq("id", req.user!.id)
+      .single();
 
     const { error } = await supabase
       .from("users")
@@ -440,6 +518,7 @@ export async function resetPaymentPin(req: AuthRequest, res: Response, next: Nex
         payment_pin_hash,
         pin_reset_otp:            null,
         pin_reset_otp_expires_at: null,
+        token_version:            (currentUser?.token_version ?? 0) + 1,
       })
       .eq("id", req.user!.id);
 

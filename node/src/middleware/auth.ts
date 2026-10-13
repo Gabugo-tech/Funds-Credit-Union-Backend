@@ -1,16 +1,17 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { errorResponse } from "../utils/response";
+import { getSupabase } from "../services/supabase";
 
 export interface AuthRequest extends Request {
   user?: { id: string; email: string; role: string };
 }
 
-export function authenticate(
+export async function authenticate(
   req: AuthRequest,
   res: Response,
   next: NextFunction
-): void {
+): Promise<void> {
   const header = req.headers.authorization;
 
   if (!header?.startsWith("Bearer ")) {
@@ -28,9 +29,32 @@ export function authenticate(
       sub: string;
       email: string;
       role: string;
+      token_version?: number;
     };
 
-    req.user = { id: payload.sub, email: payload.email, role: payload.role };
+    // Validate user is still active and token_version matches (catches post-reset sessions)
+    const { data: user } = await getSupabase()
+      .from("users")
+      .select("id, is_active, token_version, role")
+      .eq("id", payload.sub)
+      .single();
+
+    if (!user || user.is_active === false) {
+      errorResponse(res, "Account not found or disabled", 401);
+      return;
+    }
+
+    if (
+      typeof user.token_version === "number" &&
+      typeof payload.token_version === "number" &&
+      payload.token_version !== user.token_version
+    ) {
+      errorResponse(res, "Session invalidated. Please log in again.", 401);
+      return;
+    }
+
+    // Use role from DB (source of truth), not from JWT claim
+    req.user = { id: payload.sub, email: payload.email, role: user.role ?? payload.role };
     next();
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {

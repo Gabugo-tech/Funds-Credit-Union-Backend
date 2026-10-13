@@ -4,11 +4,11 @@ import { getSupabase } from "../services/supabase";
 import { AuthRequest } from "../middleware/auth";
 import { successResponse, errorResponse } from "../utils/response";
 import { AppError } from "../middleware/errorHandler";
+import { logger } from "../utils/logger";
 
-const ADMIN_EMAIL = "nnanwubagabriel@gmail.com";
-
+// Admin check uses role from JWT — not a hardcoded email
 function isAdmin(req: AuthRequest): boolean {
-  return req.user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  return req.user?.role === "admin";
 }
 
 // ─── Admin stats — real counts from the DB ────────────────────────────────────
@@ -227,7 +227,7 @@ export async function deleteUser(req: AuthRequest, res: Response, next: NextFunc
     await supabase.from("visitor_logs")  .delete().eq("user_id", id);
     await supabase.from("users")         .delete().eq("id", id);
 
-    console.log(`[deleteUser] Deleted user ${target.email} (${id}) by admin`);
+    logger.info(`[deleteUser] Deleted user ${target.email} (${id}) by admin`);
     return successResponse(res, { id, email: target.email }, "User deleted successfully");
   } catch (err) { next(err); }
 }
@@ -241,20 +241,15 @@ export async function testEmail(req: AuthRequest, res: Response, next: NextFunct
     const gmailPassword = process.env.GMAIL_APP_PASSWORD;
 
     if (!gmailUser || !gmailPassword) {
-      return errorResponse(res, "GMAIL_USER or GMAIL_APP_PASSWORD not set in environment variables", 500);
+      return errorResponse(res, "Email service not configured", 500);
     }
 
-    // Import here to avoid circular deps at module load
     const { sendPasswordResetOtp } = await import("../services/email");
-
-    // Send a test email to the admin's own address
     const testOtp = "123456";
     await sendPasswordResetOtp(gmailUser, testOtp);
 
-    return successResponse(res, {
-      gmail_user: gmailUser,
-      sent_to:    gmailUser,
-    }, `Test email sent successfully to ${gmailUser}`);
+    // Do NOT return credentials in the response
+    return successResponse(res, { sent_to: gmailUser }, `Test email sent successfully to ${gmailUser}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return errorResponse(res, `Email failed: ${msg}`, 500);

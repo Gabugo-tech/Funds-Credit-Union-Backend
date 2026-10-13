@@ -14,7 +14,7 @@ const listSchema = z.object({
   from:     z.string().optional(),
   to:       z.string().optional(),
   account_id: z.string().uuid().optional(),
-  search:   z.string().optional(),
+  search:   z.string().max(100).optional(),
 });
 
 export async function listTransactions(req: AuthRequest, res: Response, next: NextFunction) {
