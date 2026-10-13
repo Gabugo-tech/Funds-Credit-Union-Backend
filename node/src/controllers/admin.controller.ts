@@ -6,6 +6,8 @@ import { successResponse, errorResponse } from "../utils/response";
 import { AppError } from "../middleware/errorHandler";
 import { logger } from "../utils/logger";
 
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "fundscreditunion@gmail.com";
+
 // Admin check uses role from JWT — not a hardcoded email
 function isAdmin(req: AuthRequest): boolean {
   return req.user?.role === "admin";

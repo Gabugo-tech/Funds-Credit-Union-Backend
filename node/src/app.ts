@@ -4,6 +4,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
+import { randomUUID } from "crypto";
 
 import authRoutes         from "./routes/auth.routes";
 import accountRoutes      from "./routes/accounts.routes";
@@ -114,7 +115,7 @@ app.use(morgan("short", {
 
 // ─── Request ID ──────────────────────────────────────────────────────────────
 app.use((req: Request, _res: Response, next: NextFunction) => {
-  req.headers["x-request-id"] = req.headers["x-request-id"] ?? crypto.randomUUID();
+  req.headers["x-request-id"] = req.headers["x-request-id"] ?? randomUUID();
   next();
 });
 

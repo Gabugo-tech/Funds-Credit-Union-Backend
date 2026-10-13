@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { getSupabase } from "../services/supabase";
@@ -68,7 +69,7 @@ const MAX_OTP_ATTEMPTS = 5;
 /** Timing-safe OTP comparison */
 function safeCompareOtp(stored: string, provided: string): boolean {
   try {
-    return crypto.timingSafeEqual(Buffer.from(stored, "utf8"), Buffer.from(provided, "utf8"));
+    return timingSafeEqual(Buffer.from(stored, "utf8"), Buffer.from(provided, "utf8"));
   } catch {
     return false;
   }
