@@ -25,9 +25,20 @@ export async function listAccounts(req: AuthRequest, res: Response, next: NextFu
       .from("bank_accounts")
       .select("*")
       .eq("user_id", req.user!.id)
-      .order("is_primary", { ascending: false });
+      .order("is_primary", { ascending: false })
+      .order("created_at", { ascending: true }); // fallback: oldest first if no primary
 
     if (error) throw new AppError(error.message, 500);
+
+    // If no account has is_primary=true, mark the first one as primary
+    if (data && data.length > 0 && !data.some((a: { is_primary: boolean }) => a.is_primary)) {
+      await getSupabase()
+        .from("bank_accounts")
+        .update({ is_primary: true })
+        .eq("id", data[0].id);
+      data[0].is_primary = true;
+    }
+
     return successResponse(res, data ?? []);
   } catch (err) {
     next(err);
