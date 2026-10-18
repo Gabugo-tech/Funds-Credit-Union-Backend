@@ -218,19 +218,30 @@ export async function createAccount(req: AuthRequest, res: Response, next: NextF
       currency:     z.string().length(3).default("USD"),
     }).parse(req.body);
 
+    const supabase = getSupabase();
     const accountNumber = await generateUniqueAccountNumber();
 
-    const { data, error } = await getSupabase()
+    // Check if user already has any accounts
+    const { data: existing } = await supabase
+      .from("bank_accounts")
+      .select("id")
+      .eq("user_id", req.user!.id)
+      .limit(1);
+
+    // First account is always primary
+    const isPrimary = !existing || existing.length === 0;
+
+    const { data, error } = await supabase
       .from("bank_accounts")
       .insert({
-        user_id:          req.user!.id,
-        account_number:   accountNumber,
-        account_name:     body.account_name,
-        account_type:     body.account_type,
-        currency:         body.currency,
-        balance:          0,
+        user_id:           req.user!.id,
+        account_number:    accountNumber,
+        account_name:      body.account_name,
+        account_type:      body.account_type,
+        currency:          body.currency,
+        balance:           0,
         available_balance: 0,
-        is_primary:       false,
+        is_primary:        isPrimary,
       })
       .select()
       .single();
