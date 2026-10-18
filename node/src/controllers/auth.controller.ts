@@ -33,10 +33,11 @@ function signToken(userId: string, email: string, role = "user", tokenVersion = 
   return jwt.sign({ sub: userId, email, role, token_version: tokenVersion }, secret, { expiresIn } as jwt.SignOptions);
 }
 
-/** Generate a unique 10-digit numeric account number (no prefix) */
+/** Generate a unique 10-digit numeric account number */
 function generateAccountNumber(): string {
+  // First digit 1-9 (no leading zero), rest 0-9
   const first = Math.floor(Math.random() * 9 + 1).toString();
-  const rest   = Math.floor(Math.random() * 1_000_000_000)
+  const rest = Math.floor(Math.random() * 1_000_000_000)
     .toString()
     .padStart(9, "0");
   return `${first}${rest}`;
