@@ -90,9 +90,9 @@ export async function sendMoney(req: AuthRequest, res: Response, next: NextFunct
 
     // Generate collision-proof references using UUID segments
     const baseRef     = uuidv4().replace(/-/g, "").slice(0, 16).toUpperCase();
-    const reference   = `EG${baseRef}`;
-    const referenceCR = `${reference}CR`; // credit leg
-    const referenceDR = `${reference}DR`; // debit leg
+    const reference   = `FCU${baseRef}`;
+    const referenceCR = `${reference}CR`;
+    const referenceDR = `${reference}DR`;
 
     // Look up recipient before touching balances
     const { data: recipientAccount } = await supabase
