@@ -57,8 +57,8 @@ export async function sendMoney(req: AuthRequest, res: Response, next: NextFunct
     const pinValid = await bcrypt.compare(body.payment_pin, userPinData.payment_pin_hash);
     if (!pinValid) return errorResponse(res, "Incorrect payment PIN", 401);
 
-    const balance          = typeof account.balance === "string" ? parseFloat(account.balance) : Number(account.balance);
-    const availableBalance = typeof account.available_balance === "string" ? parseFloat(account.available_balance) : Number(account.available_balance ?? account.balance);
+    const balance          = parseFloat(String(account.balance));
+    const availableBalance = parseFloat(String(account.available_balance ?? account.balance));
 
     // Fee is always $2.50 USD for international — convert to account's native currency
     const feeUSD              = body.transfer_type === "international" ? 2.5 : 0;
@@ -80,13 +80,12 @@ export async function sendMoney(req: AuthRequest, res: Response, next: NextFunct
       `totalDebit=${totalDebit.toFixed(4)} | type=${body.transfer_type}`
     );
 
-    // Only block local transfers for insufficient funds.
-    // Round to 2 decimal places to avoid floating-point precision issues
-    // (e.g. balance stored as 29.589999 displayed as 29.59).
-      if (body.transfer_type === "local" && Math.round(balance * 100) < Math.round(totalDebit * 100)) {
-        logger.warn(`[sendMoney] INSUFFICIENT: balance(${balance}) < totalDebit(${totalDebit.toFixed(4)})`);
-        return errorResponse(res, "Insufficient balance", 422);
-      }
+    // Balance check — use direct comparison with small epsilon for floating-point tolerance
+    // Avoid Math.round(x * 100) which overflows for very large balances (e.g. $1 trillion)
+    if (body.transfer_type === "local" && (balance - totalDebit) < -0.001) {
+      logger.warn(`[sendMoney] INSUFFICIENT: balance(${balance}) < totalDebit(${totalDebit.toFixed(4)})`);
+      return errorResponse(res, "Insufficient balance", 422);
+    }
 
     // Generate collision-proof references using UUID segments
     const baseRef     = uuidv4().replace(/-/g, "").slice(0, 16).toUpperCase();
@@ -142,8 +141,8 @@ export async function sendMoney(req: AuthRequest, res: Response, next: NextFunct
       const recipientRate             = FX_RATES[recipientCurrency] ?? 1;
       // amount (in from_currency) → USD → recipient currency
       const creditAmount              = (body.amount / fromRate) * recipientRate;
-      const recipientBalance          = typeof recipientAccount.balance === "string" ? parseFloat(recipientAccount.balance) : Number(recipientAccount.balance);
-      const recipientAvailableBalance = typeof recipientAccount.available_balance === "string" ? parseFloat(recipientAccount.available_balance) : Number(recipientAccount.available_balance ?? recipientAccount.balance);
+      const recipientBalance          = parseFloat(String(recipientAccount.balance));
+      const recipientAvailableBalance = parseFloat(String(recipientAccount.available_balance ?? recipientAccount.balance));
 
       await supabase
         .from("bank_accounts")
