@@ -37,9 +37,10 @@ export async function getProfile(req: AuthRequest, res: Response, next: NextFunc
 export async function updateProfile(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const body = z.object({
-      full_name: z.string().min(2).optional(),
-      phone:     z.string().optional(),
-      address:   z.string().optional(),
+      full_name:  z.string().min(2).optional(),
+      phone:      z.string().optional(),
+      address:    z.string().optional(),
+      avatar_url: z.string().nullable().optional(), // allow null to remove avatar
     }).parse(req.body);
 
     const { data, error } = await getSupabase()
