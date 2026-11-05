@@ -66,7 +66,23 @@ export async function uploadAvatar(req: AuthRequest, res: Response, next: NextFu
     const ext       = file.mimetype.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";
     const path      = `avatars/${userId}.${ext}`;
 
-    // Upsert into Supabase Storage bucket "avatars" (create it if it doesn't exist)
+    // Check if bucket exists, create if not
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets?.some(b => b.name === "avatars");
+    
+    if (!bucketExists) {
+      const { error: createErr } = await supabase.storage.createBucket("avatars", {
+        public: true,
+        fileSizeLimit: 5242880, // 5MB
+        allowedMimeTypes: ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"],
+      });
+      if (createErr) {
+        console.error("[uploadAvatar] Bucket creation failed:", createErr);
+        throw new AppError("Storage bucket unavailable", 500);
+      }
+    }
+
+    // Upsert into Supabase Storage bucket "avatars"
     const { error: uploadErr } = await supabase.storage
       .from("avatars")
       .upload(path, file.buffer, {

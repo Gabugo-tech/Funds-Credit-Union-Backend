@@ -1,22 +1,38 @@
-import { BrevoClient } from "@getbrevo/brevo";
+// Send emails via Google Apps Script Web App
+// Deploy your script at script.google.com and set GOOGLE_APPS_SCRIPT_URL in .env
 
-if (!process.env.BREVO_API_KEY) {
-  console.warn("[email] BREVO_API_KEY not set — emails will fail");
+const SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL ?? "";
+
+if (!SCRIPT_URL) {
+  console.warn("[email] GOOGLE_APPS_SCRIPT_URL not set — emails will fail");
 }
 
-const client = new BrevoClient({ apiKey: process.env.BREVO_API_KEY ?? "" });
-
-const FROM_EMAIL = process.env.BREVO_FROM_EMAIL ?? "noreply@fundscreditunion.com";
+const FROM_EMAIL = process.env.FROM_EMAIL ?? "noreply@fundscreditunion.com";
 const FROM_NAME  = "Funds Credit Union";
 
 async function send(to: string, subject: string, htmlContent: string, textContent: string) {
-  await client.transactionalEmails.sendTransacEmail({
-    sender:      { name: FROM_NAME, email: FROM_EMAIL },
-    to:          [{ email: to }],
-    subject,
-    htmlContent,
-    textContent,
+  if (!SCRIPT_URL) {
+    console.error("[email] Cannot send — GOOGLE_APPS_SCRIPT_URL not configured");
+    return;
+  }
+
+  const res = await fetch(SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      to,
+      from: FROM_EMAIL,
+      fromName: FROM_NAME,
+      subject,
+      htmlBody: htmlContent,
+      textBody: textContent,
+    }),
   });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Email send failed: ${res.status} ${text}`);
+  }
 }
 
 function buildOtpEmail(subtitle: string, message: string, otp: string): string {
